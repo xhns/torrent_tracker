@@ -78,28 +78,25 @@ mixin HttpTrackerBase {
       throw Exception('Query params can not be empty');
     }
 
-    var _queryStr = parameters.keys.fold('', (previousValue, key) {
+    var queryStr = parameters.keys.fold('', (previousValue, key) {
       var values = parameters[key];
       if (values is String) {
         previousValue += '&$key=$values';
         return previousValue;
-      }else{
+      } else {
         //is List
-        values.forEach((value) => previousValue += '&$key=$value');
+        for (var value in values) {
+          previousValue += '&$key=$value';
+        }
         return previousValue;
       }
     });
 
-    // if (_queryStr.isNotEmpty) _queryStr = _queryStr.substring(1); scrape
-    var str = _rawUrl;
-    str = '${url.origin}${url.path}?';
+    // if (queryStr.isNotEmpty) queryStr = queryStr.substring(1); scrape
+    var str = '${url.origin}${url.path}?';
     if (!str.contains('?')) str += '?';
-    str += _queryStr;
+    str += queryStr;
     return str;
-  }
-
-  String get _rawUrl {
-    return '${url.origin}${url.path}';
   }
 
   ///
@@ -142,8 +139,7 @@ mixin HttpTrackerBase {
       return null;
     }
     try {
-      var url;
-      url = _createAccessURL(options);
+      var url = _createAccessURL(options);
       var uri = Uri.parse(url);
       _httpClient?.close();
       _httpClient = HttpClient();

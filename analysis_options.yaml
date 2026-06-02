@@ -1,14 +1,15 @@
-# Defines a default set of lint rules enforced for
-# projects at Google. For details and rationale,
-# see https://github.com/dart-lang/pedantic#enabled-lints.
-include: package:pedantic/analysis_options.yaml
+include: package:lints/recommended.yaml
 
-# For lint rules and documentation, see http://dart-lang.github.io/linter/lints.
-# Uncomment to specify additional rules.
-# linter:
-#   rules:
-#     - camel_case_types
+# For lint rules and documentation, see https://dart.dev/tools/linter-rules.
+linter:
+  rules:
+    # The SCREAMING_CASE constants (EVENT_STARTED, ACTION_*, START_CONNECTION_ID,
+    # DEFAULT_INTERVAL_TIME, ...) are part of the long-standing public API of this
+    # library. Renaming them would be a breaking change, so the naming lints are
+    # disabled instead of mass-renaming exported identifiers.
+    constant_identifier_names: false
+    non_constant_identifier_names: false
 
-analyzer:
+# analyzer:
 #   exclude:
 #     - path/to/excluded/files/**
