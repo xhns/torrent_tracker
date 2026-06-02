@@ -15,9 +15,9 @@ import 'tracker.dart';
 /// UDP Tracker
 class UDPTracker extends Tracker with UDPTrackerBase {
   String? _currentEvent;
-  UDPTracker(Uri _uri, Uint8List infoHashBuffer,
+  UDPTracker(Uri uri, Uint8List infoHashBuffer,
       {AnnounceOptionsProvider? provider})
-      : super('udp:${_uri.host}:${_uri.port}', _uri, infoHashBuffer,
+      : super('udp:${uri.host}:${uri.port}', uri, infoHashBuffer,
             provider: provider);
   String? get currentEvent {
     return _currentEvent;
@@ -28,13 +28,13 @@ class UDPTracker extends Tracker with UDPTrackerBase {
     try {
       var ips = await InternetAddress.lookup(announceUrl.host);
       var l = <CompactAddress>[];
-      ips.forEach((element) {
+      for (var element in ips) {
         try {
           l.add(CompactAddress(element, announceUrl.port));
         } catch (e) {
           //
         }
-      });
+      }
       return l;
     } catch (e) {
       return null;
@@ -75,25 +75,28 @@ class UDPTracker extends Tracker with UDPTrackerBase {
       // 数据不正确
       throw Exception('announce data is wrong');
     }
-    var view = ByteData.view(data.buffer);
+    var view = ByteData.view(data.buffer, data.offsetInBytes);
+    // BEP15 announce response layout after action(0)/transaction_id(4):
+    //   interval @8, leechers @12, seeders @16. `complete` is seeders and
+    //   `incomplete` is leechers (previously these two were swapped).
     var event = PeerEvent(infoHash!, announceUrl,
         interval: view.getUint32(8),
-        incomplete: view.getUint32(16),
-        complete: view.getUint32(12));
+        incomplete: view.getUint32(12), // leechers
+        complete: view.getUint32(16)); // seeders
     var ips = data.sublist(20);
     var add = addresses.elementAt(0);
     var type = add.address.type;
     try {
       if (type == InternetAddressType.IPv4) {
         var list = CompactAddress.parseIPv4Addresses(ips);
-        list?.forEach((c) {
+        for (var c in list) {
           event.addPeer(c);
-        });
+        }
       } else if (type == InternetAddressType.IPv6) {
-        var list = CompactAddress.parseIPv4Addresses(ips);
-        list?.forEach((c) {
+        var list = CompactAddress.parseIPv6Addresses(ips);
+        for (var c in list) {
           event.addPeer(c);
-        });
+        }
       }
     } catch (e) {
       // 容错

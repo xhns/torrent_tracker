@@ -18,10 +18,10 @@ import 'tracker.dart';
 class HttpTracker extends Tracker with HttpTrackerBase {
   String? _trackerId;
   String? _currentEvent;
-  HttpTracker(Uri _uri, Uint8List infoHashBuffer,
+  HttpTracker(Uri uri, Uint8List infoHashBuffer,
       {AnnounceOptionsProvider? provider})
       : super(
-            'http:${_uri.host}:${_uri.port}${_uri.path}', _uri, infoHashBuffer,
+            'http:${uri.host}:${uri.port}${uri.path}', uri, infoHashBuffer,
             provider: provider);
 
   String? get currentTrackerId {
@@ -123,9 +123,14 @@ class HttpTracker extends Tracker with HttpTrackerBase {
       var errorMsg = String.fromCharCodes(result['failure reason']);
       throw errorMsg;
     }
-    // If 'tracker id' is existed, record it
-    if (result['tracker id'] != null) {
-      _trackerId = result['tracker id'];
+    // If 'tracker id' is existed, record it.
+    // bencode decodes string values as raw bytes (Uint8List), so decode them to
+    // a String before storing; otherwise assigning to `_trackerId` (String?)
+    // would throw a runtime TypeError.
+    var trackerId = result['tracker id'];
+    if (trackerId != null) {
+      _trackerId =
+          trackerId is String ? trackerId : String.fromCharCodes(trackerId);
     }
 
     var event = PeerEvent(infoHash!, url);
@@ -175,22 +180,29 @@ class HttpTracker extends Tracker with HttpTrackerBase {
       if (type == InternetAddressType.IPv6) {
         try {
           var peers = CompactAddress.parseIPv6Addresses(value);
-          peers.forEach((peer) => event.addPeer(peer));
+          for (var peer in peers) {
+            event.addPeer(peer);
+          }
         } catch (e) {
           //
         }
       } else if (type == InternetAddressType.IPv4) {
         try {
           var peers = CompactAddress.parseIPv4Addresses(value);
-          peers.forEach((peer) => event.addPeer(peer));
+          for (var peer in peers) {
+            event.addPeer(peer);
+          }
         } catch (e) {
           //
         }
       }
     } else {
       if (value is List) {
-        value.forEach((peer) {
-          var ip = peer['ip'];
+        for (var peer in value) {
+          var rawIp = peer['ip'];
+          // bencode decodes string values as raw bytes, so 'ip' may be a
+          // Uint8List; normalise it to a String before parsing.
+          var ip = rawIp is String ? rawIp : String.fromCharCodes(rawIp);
           var port = peer['port'];
           var address = InternetAddress.tryParse(ip);
           if (address != null) {
@@ -201,7 +213,7 @@ class HttpTracker extends Tracker with HttpTrackerBase {
                   error: e, name: runtimeType.toString());
             }
           }
-        });
+        }
       }
     }
   }
