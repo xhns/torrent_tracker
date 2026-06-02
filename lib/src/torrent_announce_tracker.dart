@@ -43,6 +43,19 @@ class TorrentAnnounceTracker {
 
   final int _retryAfter = 5;
 
+  /// Roughly how many trackers to kick off per second when announcing a batch,
+  /// to avoid an N-way concurrent DNS/TLS/UDP-handshake burst at startup.
+  static const int _staggerPerSecond = 4;
+
+  /// Base spacing (ms) between staggered announces; a small random jitter is
+  /// added per announce so they don't all line up on the same tick.
+  static const int _staggerBaseMs = 1000 ~/ _staggerPerSecond;
+
+  /// Pending staggered-announce timers, so they can be cancelled on dispose.
+  final Set<Timer> _staggerTimers = <Timer>{};
+
+  final Random _staggerRandom = Random();
+
   // final Set<String> _announceOverTrackers = {};
 
   ///
@@ -129,6 +142,10 @@ class TorrentAnnounceTracker {
       record[0].cancel();
     });
     _announceRetryTimers.clear();
+    for (var t in _staggerTimers) {
+      t.cancel();
+    }
+    _staggerTimers.clear();
   }
 
   Tracker? _createTracker(Uri? announce, Uint8List? infohash) {
@@ -174,6 +191,25 @@ class TorrentAnnounceTracker {
       bool forceStop = false,
       int maxRetryTimes = 3}) {
     if (isDisposed) return;
+    // For start, stagger the announces so we don't fire N concurrent
+    // DNS/TLS/UDP handshakes at once (UI stutter / startup CPU burst). Other
+    // events (stop/complete) stay immediate. Semantics are unchanged: every
+    // tracker still eventually announces.
+    if (event == EVENT_STARTED) {
+      var i = 0;
+      for (var announce in announces) {
+        var delayMs = i * _staggerBaseMs + _staggerRandom.nextInt(_staggerBaseMs);
+        i++;
+        late Timer timer;
+        timer = Timer(Duration(milliseconds: delayMs), () {
+          _staggerTimers.remove(timer);
+          if (isDisposed) return;
+          runTracker(announce, infoHash, event: event, force: forceStop);
+        });
+        _staggerTimers.add(timer);
+      }
+      return;
+    }
     for (var announce in announces) {
       runTracker(announce, infoHash, event: event, force: forceStop);
     }

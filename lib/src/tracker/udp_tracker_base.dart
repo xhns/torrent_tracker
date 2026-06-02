@@ -45,6 +45,16 @@ mixin UDPTrackerBase {
 
   bool get isClosed => _closed;
 
+  /// Max number of send retries when the OS send buffer is full before giving
+  /// up (instead of busy-rescheduling forever).
+  static const int _maxSendRetry = 5;
+
+  /// How many send retries have happened for the in-flight message.
+  int _sendRetry = 0;
+
+  /// Backoff timer for the next send retry (cancelled on [close]).
+  Timer? _sendRetryTimer;
+
   /// 获取当前transcation id，如果有就返回，表示当前通信还未完结。如果没有就重新生成
   List<int> get transcationId {
     _transcationId ??= _generateTranscationId();
@@ -205,6 +215,8 @@ mixin UDPTrackerBase {
   /// 关闭连接以及清楚设置
   Future? close() {
     _closed = true;
+    _sendRetryTimer?.cancel();
+    _sendRetryTimer = null;
     _socket?.close();
     _socket = null;
     return null;
@@ -218,8 +230,22 @@ mixin UDPTrackerBase {
       var bytes = _socket?.send(message, element.address, element.port);
       if (bytes != 0) success = true;
     }
-    if (!success) {
-      Timer.run(() => _sendMessage(message, addresses));
+    if (success) {
+      _sendRetry = 0;
+      return;
     }
+    // Send buffer full: back off with a small growing delay instead of a tight
+    // Timer.run(no-delay) busy-loop, and cap the number of retries.
+    if (_sendRetry >= _maxSendRetry) {
+      _sendRetry = 0;
+      return;
+    }
+    var delayMs = 20 * (1 << _sendRetry); // 20,40,80,160,320ms
+    _sendRetry++;
+    _sendRetryTimer?.cancel();
+    _sendRetryTimer = Timer(Duration(milliseconds: delayMs), () {
+      if (isClosed) return;
+      _sendMessage(message, addresses);
+    });
   }
 }

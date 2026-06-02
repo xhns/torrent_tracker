@@ -117,13 +117,16 @@ mixin HttpTrackerBase {
 
   StreamSubscription? _sc;
 
-  Future _receiveResponseData(HttpClientResponse response) async {
-    var c = Completer();
-    var d = <int>[];
+  Future<Uint8List> _receiveResponseData(HttpClientResponse response) async {
+    var c = Completer<Uint8List>();
+    // Accumulate chunks in a BytesBuilder instead of a growing List<int> +
+    // per-chunk addAll; takeBytes() yields the final Uint8List with no extra
+    // Uint8List.fromList copy at the call site.
+    var builder = BytesBuilder(copy: false);
     _sc = response.listen((event) {
-      d.addAll(event);
+      builder.add(event);
     }, onDone: () {
-      if (!c.isCompleted) c.complete(d);
+      if (!c.isCompleted) c.complete(builder.takeBytes());
     }, onError: (e) {
       if (!c.isCompleted) c.completeError(e);
     });
@@ -148,7 +151,7 @@ mixin HttpTrackerBase {
       var response = await _request!.close();
       var datas = await _receiveResponseData(response);
       _clear();
-      return processResponseData(Uint8List.fromList(datas));
+      return processResponseData(datas);
     } catch (e) {
       _clear();
       rethrow;
