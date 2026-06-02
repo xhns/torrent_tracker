@@ -14,12 +14,12 @@ jobs:
 
       - name: Clone sibling deps
         run: |
-          git clone --depth 1 --branch chore/modernize-dart3 \
+          git clone --depth 1 \
             https://github.com/xhns/dartorrent_common.git "$GITHUB_WORKSPACE/../dartorrent_common"
-          git clone --depth 1 --branch chore/modernize-dart3 \
+          git clone --depth 1 \
             https://github.com/xhns/bencode_dart.git "$GITHUB_WORKSPACE/../bencode_dart"
           # dev_dependency used by example/; also Dart-3 ready on this branch
-          git clone --depth 1 --branch chore/modernize-dart3 \
+          git clone --depth 1 \
             https://github.com/xhns/torrent_model.git "$GITHUB_WORKSPACE/../torrent_model"
 
       - name: Install dependencies
