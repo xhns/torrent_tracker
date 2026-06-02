@@ -1,14 +1,12 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:dartorrent_common/dartorrent_common.dart';
 
-import 'package:torrent_tracker/src/torrent_announce_tracker.dart';
 import 'package:torrent_tracker/torrent_tracker.dart';
 import 'package:torrent_model/torrent_model.dart';
 
 void main() async {
-  var torrent = await Torrent.parse('example/test9.torrent');
+  var torrent = await Torrent.parse('example/test.torrent');
   var id = generatePeerId();
   var port = 55551;
   var provider = SimpleProvider(torrent, id, port);
@@ -28,7 +26,6 @@ void main() async {
     });
     torrentTracker.onPeerEvent((source, event) {
       // print('${source.announceUrl} peer event: $event');
-      if (event == null) return;
       peerAddress.addAll(event.peers);
       source.dispose('Complete Announc');
       print('got ${peerAddress.length} peers');
@@ -84,6 +81,6 @@ class SimpleProvider implements AnnounceOptionsProvider {
 String generatePeerId() {
   var r = randomBytes(9);
   var base64Str = base64Encode(r);
-  var id = '-MURLIN-' + base64Str;
+  var id = '-MURLIN-$base64Str';
   return id;
 }
